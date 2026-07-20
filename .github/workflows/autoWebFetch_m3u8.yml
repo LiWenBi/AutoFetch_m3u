@@ -27,7 +27,7 @@ jobs:
 
     # 4. 执行 Python 脚本收集并去重
     - name: Run M3U8 Collector
-      run: python fetch_m3u8.py
+      run: python WebFetch_m3u8/fetch_m3u8.py
 
     # 5. 将更新后的 live_links.txt 文件自动提交回 GitHub 仓库
     - name: Commit and Push Changes
