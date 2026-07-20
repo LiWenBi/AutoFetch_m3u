@@ -1,5 +1,6 @@
 import os
 import time
+import json
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 
@@ -28,41 +29,60 @@ def fetch_m3u8_from_url(url, existing_links):
     new_links = set()
     
     options = Options()
-    options.add_argument("--headless")  # 无头模式
+    options.add_argument("--headless=new")  # 使用全新的无头模式，更难被检测
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     
-    # 修正后的新版配置日志写法
+    # 绕过成人网站和反爬系统的关键伪装参数
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+    options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    options.add_experimental_option('useAutomationExtension', False)
+    
+    # 开启性能日志
     options.set_capability('goog:loggingPrefs', {'performance': 'ALL'})
     
-    # 初始化浏览器（确保这一行是 4 个空格缩进）
     driver = webdriver.Chrome(options=options)
     
-    # 注意：这里的 try 必须和上面的 driver = ... 保持完全对齐（4个空格）
+    # 执行 JavaScript 抹除自动化特征
+    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
+        "source": "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
+    })
+    
     try:
         print(f"正在访问: {url}")
         driver.get(url)
-        time.sleep(10)  # 等待页面加载
+        
+        # 针对这类直播网站，适当延长等待时间（15秒），让 Cloudflare 验证通过并加载出直播视频
+        time.sleep(15) 
         
         # 解析浏览器网络日志
         logs = driver.get_log('performance')
         for entry in logs:
-            import json
-            log = json.loads(entry['message'])['message']
-            if 'Network.requestWillBeSent' in log['method']:
-                request_url = log['params']['request']['url']
-                if ".m3u8" in request_url:
-                    if request_url not in existing_links:
-                        print(f"发现新链接: {request_url}")
-                        new_links.add(request_url)
+            try:
+                log = json.loads(entry['message'])['message']
+                if 'Network.requestWillBeSent' in log.get('method', ''):
+                    params = log.get('params', {})
+                    request = params.get('request', {})
+                    request_url = request.get('url', '')
+                    
+                    # 匹配 m3u8 链接
+                    if ".m3u8" in request_url:
+                        # 部分平台的 m3u8 后面带有超长动态 token，这里进行去重清洗（只保留问号前的主干 URL）
+                        clean_url = request_url.split('?')[0]
                         
+                        if clean_url not in existing_links and clean_url not in new_links:
+                            print(f"发现新链接: {clean_url}")
+                            new_links.add(clean_url)
+            except Exception:
+                continue # 遇到解析不规范的日志片段直接跳过，不中断程序
+                
     except Exception as e:
         print(f"访问出错 {url}: {e}")
     finally:
         driver.quit()
         
     return new_links
-
 
 if __name__ == "__main__":
     existing_links = load_existing_links()
