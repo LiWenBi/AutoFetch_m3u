@@ -32,11 +32,12 @@ def fetch_m3u8_from_url(url, existing_links):
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     
-    # 开启性能日志以捕获网络请求
-    capabilities = webdriver.DesiredCapabilities.CHROME.copy()
-    capabilities['goog:loggingPrefs'] = {'performance': 'ALL'}
-    
-    driver = webdriver.Chrome(options=options, desired_capabilities=capabilities)
+    # 1. 直接在 options 中设置性能日志（新版推荐写法）
+options.set_capability('goog:loggingPrefs', {'performance': 'ALL'})
+
+# 2. 初始化 Driver 时，只传入 options 参数即可
+driver = webdriver.Chrome(options=options)
+
     
     try:
         print(f"正在访问: {url}")
