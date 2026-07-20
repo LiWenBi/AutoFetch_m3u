@@ -1,3 +1,28 @@
+import os
+import time
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+
+# 1. 配置需要收集的直播网页列表
+TARGET_URLS = [
+    "https://zh.stripchat.com/winter11",
+    "https://zh-hans.chaturbate.com/baeasian/"
+]
+DATA_FILE = "live_links.txt"
+
+def load_existing_links():
+    """读取本地已有的链接，防止重复"""
+    if os.path.exists(DATA_FILE):
+        with open(DATA_FILE, "r", encoding="utf-8") as f:
+            return set(line.strip() for line in f if line.strip())
+    return set()
+
+def save_links(links):
+    """保存不重复的链接"""
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        for link in sorted(links):
+            f.write(f"{link}\n")
+
 def fetch_m3u8_from_url(url, existing_links):
     """启动无头浏览器，捕获网络请求中的 m3u8 链接"""
     new_links = set()
@@ -37,3 +62,19 @@ def fetch_m3u8_from_url(url, existing_links):
         driver.quit()
         
     return new_links
+
+
+if __name__ == "__main__":
+    existing_links = load_existing_links()
+    all_new_links = set()
+    
+    for url in TARGET_URLS:
+        new_urls = fetch_m3u8_from_url(url, existing_links)
+        all_new_links.update(new_urls)
+        
+    if all_new_links:
+        final_links = existing_links.union(all_new_links)
+        save_links(final_links)
+        print(f"任务完成！新增 {len(all_new_links)} 条链接，总计 {len(final_links)} 条。")
+    else:
+        print("未发现新的 m3u8 链接。")
