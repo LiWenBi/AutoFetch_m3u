@@ -1,104 +1,83 @@
-import os 
-import time 
-import json 
-import sys
-from selenium import webdriver 
-from selenium.webdriver.chrome.options import Options 
+import os
+import re
+import json
+import time
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 
-# 1. 配置需要收集的直播网页列表 
-TARGET_URLS = [ 
-    "https://chococams.com", 
-    "https://chococams.com",  
-    "https://chococams.com" 
-] 
-DATA_FILE = "live_links.txt" 
+# 配置文件路径
+URL_FILE = 'url.txt'
+OUTPUT_FILE = 'live_links.txt'
 
-def load_existing_links(): 
-    """读取本地已有的链接，防止重复""" 
-    if os.path.exists(DATA_FILE): 
-        with open(DATA_FILE, "r", encoding="utf-8") as f: 
-            return set(line.strip() for line in f if line.strip()) 
-    return set() 
+def get_optimized_chrome():
+    """为 Linux 容器环境配置 Chrome"""
+    chrome_options = Options()
+    # 核心修复参数：无头模式、沙盒限制、共享内存、GPU禁用
+    options = ['--headless=new', '--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
+    for arg in options:
+        chrome_options.add_argument(arg)
+    return webdriver.Chrome(options=chrome_options)
 
-def save_links(links): 
-    """保存不重复的链接""" 
-    with open(DATA_FILE, "w", encoding="utf-8") as f: 
-        for link in sorted(links): 
-            f.write(f"{link}\n") 
+def extract_m3u8_from_logs(driver):
+    """从网络日志中提取 m3u8 链接"""
+    m3u8_urls = set()
+    try:
+        logs = driver.get_log('performance')
+        for entry in logs:
+            log_data = json.loads(entry['message'])['message']
+            # 只关注网络请求的发送或接收
+            if 'Network.requestWillBeSent' in log_data['method']:
+                request_url = log_data['params']['request']['url']
+                # 匹配包含 .m3u8 且不包含 'master' 的链接（不区分大小写）
+                if '.m3u8' in request_url.lower() and 'master' not in request_url.lower():
+                    m3u8_urls.add(request_url)
+    except Exception as e:
+        print(f"解析日志出错: {e}")
+    return m3u8_urls
 
-def fetch_m3u8_from_url(url, existing_links): 
-    """动态选择有头/无头模式，捕获网络请求中的 m3u8 链接""" 
-    new_links = set() 
-    options = Options() 
+def main():
+    # 检查并读取 url.txt
+    if not os.path.exists(URL_FILE):
+        print(f"错误：未找到 {URL_FILE} 文件，请在同级目录下创建并添加目标网页地址。")
+        return
     
-    # 严格检查运行环境：如果检测到是 GitHub Actions，则强制启动无头模式防闪退
-    if os.environ.get('GITHUB_ACTIONS') == 'true':
-        print("[环境提示] 当前处于 GitHub Actions 云端环境，强制启用 --headless 无头模式。")
-        options.add_argument("--headless=new") 
-        options.add_argument("--no-sandbox") 
-        options.add_argument("--disable-dev-shm-usage") 
-        options.add_argument("--disable-gpu")
-    else:
-        print("[环境提示] 当前处于本地电脑环境，正在为您启动【有头浏览器】窗口。")
-    
-    # 保持防爬虫伪装参数
-    options.add_argument("--disable-blink-features=AutomationControlled") 
-    options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36") 
-    options.add_experimental_option("excludeSwitches", ["enable-automation"]) 
-    options.add_experimental_option('useAutomationExtension', False) 
-    
-    # 开启性能日志
-    options.set_capability('goog:loggingPrefs', {'performance': 'ALL'}) 
-    
-    driver = webdriver.Chrome(options=options) 
-    
-    # 执行 JavaScript 抹除自动化特征 
-    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", { 
-        "source": "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})" 
-    }) 
-    
-    try: 
-        print(f"正在访问: {url}") 
-        driver.get(url) 
+    with open(URL_FILE, 'r', encoding='utf-8') as f:
+        urls = [line.strip() for line in f if line.strip()]
         
-        # 延长等待时间供页面完整加载
-        print("等待 15 秒加载媒体流数据...")
-        time.sleep(15) 
-        
-        # 解析浏览器网络日志 
-        logs = driver.get_log('performance') 
-        for entry in logs: 
-            try: 
-                log = json.loads(entry['message'])['message'] 
-                if 'Network.requestWillBeSent' in log.get('method', ''): 
-                    params = log.get('params', {}) 
-                    request = params.get('request', {}) 
-                    request_url = request.get('url', '') 
-                    
-                    # 匹配 m3u8 链接 
-                    if ".m3u8" in request_url: 
-                        # 【核心修复】取 split 后的第 0 个元素，确保 clean_url 是纯字符串而不是 List 列表
-                        clean_url = request_url.split('?')[0] 
-                        if clean_url not in existing_links and clean_url not in new_links: 
-                            print(f"发现新链接: {clean_url}") 
-                            new_links.add(clean_url) 
-            except Exception: 
-                continue 
-    except Exception as e: 
-        print(f"访问出错 {url}: {e}") 
-    finally: 
-        driver.quit() 
-    return new_links 
+    if not urls:
+        print(f"{URL_FILE} 中没有找到有效的网址。")
+        return
 
-if __name__ == "__main__": 
-    existing_links = load_existing_links() 
-    all_new_links = set() 
-    for url in TARGET_URLS: 
-        new_urls = fetch_m3u8_from_url(url, existing_links) 
-        all_new_links.update(new_urls) 
-    if all_new_links: 
-        final_links = existing_links.union(all_new_links) 
-        save_links(final_links) 
-        print(f"任务完成！新增 {len(all_new_links)} 条链接，总计 {len(final_links)} 条。") 
-    else: 
-        print("未发现新的 m3u8 链接。")
+    print(f"已加载 {len(urls)} 个网页地址，准备开始动态解析...")
+    
+    all_extracted_m3u8 = set()
+    driver = init_driver()
+
+    try:
+        for idx, url in enumerate(urls, 1):
+            print(f"[{idx}/{len(urls)}] 正在解析网页: {url}")
+            try:
+                driver.get(url)
+                # 等待 8 秒让网页动态加载并播放视频流（可根据网速调整）
+                time.sleep(8) 
+                
+                # 抓取当前页面的 m3u8 链接
+                found_urls = extract_m3u8_from_logs(driver)
+                print(f"-> 发现 {len(found_urls)} 个符合要求的 m3u8 链接")
+                all_extracted_m3u8.update(found_urls)
+                
+            except Exception as e:
+                print(f"访问网页失败 {url}: {e}")
+                
+    finally:
+        driver.quit()
+
+    # 将结果写入 live_links.txt（自动去重并覆盖/创建文件）
+    with open(OUTPUT_FILE, 'w', encoding='utf-8') as f_out:
+        for link in sorted(all_extracted_m3u8):
+            f_out.write(link + '\n')
+            
+    print(f"\n🎉 任务完成！共获取到 {len(all_extracted_m3u8)} 个去重后的链接，已保存至 '{OUTPUT_FILE}'。")
+
+if __name__ == '__main__':
+    main()
