@@ -1,46 +1,43 @@
-name: Auto Fetch M3U8 Links
+name: Auto Fetch M3U8 Live Streams
 
+# 触发条件
 on:
-  push:
-    branches: [main]
+  # 1. 允许你在 GitHub 网页端手动点击按钮触发运行
   workflow_dispatch:
+  
+  # 2. 定时任务：每小时自动运行一次（注：UTC 时间比北京时间慢 8 小时）
   schedule:
-    - cron: '0 0 * * *'
-
-permissions:
-  contents: write
+    - cron: '0 * * * *'
 
 jobs:
-  fetch_job:
+  run-spider:
     runs-on: ubuntu-latest
+
     steps:
-    # 💡 建议将 checkout 保持在最新，自动适配 GitHub Actions 的 Node 24 环境
-    - uses: actions/checkout@v4
-    
-    - uses: actions/setup-python@v5
+    # 第一步：下载你仓库中的 Python 代码
+    - name: Checkout Repository Code
+      uses: actions/checkout@v4
+
+    # 第二步：在云端安装 Python 环境
+    - name: Set up Python
+      uses: actions/setup-python@v5
       with:
         python-version: '3.10'
-        # 💡 核心修复：移除了引发报错的 cache: 'pip' 行，不再强制要求 requirements.txt 
+        cache: 'pip' # 开启缓存加速后续运行
 
-    - name: Install Dependencies
+    # 第三步：安装 Python 依赖库
+    - name: Install Python Dependencies
       run: |
         python -m pip install --upgrade pip
         pip install playwright
 
-    - name: Ensure Playwright browsers are installed
-      run: playwright install chromium --with-deps
-
-    - name: Run Fetch Script
-      run: python fetch_m3u8.py
-
-    - name: Commit and Push Changes
+    # 第四步：安装 Playwright 专属的 Chromium 浏览器内核及其系统依赖
+    - name: Install Playwright Chromium Browser
       run: |
-        git config --global user.name "github-actions[bot]"
-        git config --global user.email "41898282+github-actions[bot]@://github.com"
-        
-        if [ -f "live_links.txt" ]; then
-          git add live_links.txt
-          git diff --staged --quiet || (git commit -m "chore: auto update m3u8 links [skip ci]" && git push)
-        else
-          echo "⚠️ 未找到 live_links.txt 文件，跳过提交步骤。"
-        fi
+        playwright install chromium --with-deps
+
+    # 第五步：执行你的 Python 脚本
+    # 假设你的 Python 脚本文件名叫 main.py
+    - name: Run M3U8 Extractor Script
+      run: |
+        python WebFetch_m3u8/fetch_m3u8.py
