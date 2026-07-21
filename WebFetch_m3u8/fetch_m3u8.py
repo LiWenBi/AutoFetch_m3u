@@ -1,14 +1,15 @@
 import os 
 import time 
 import json 
+import sys
 from selenium import webdriver 
 from selenium.webdriver.chrome.options import Options 
 
 # 1. 配置需要收集的直播网页列表 
 TARGET_URLS = [ 
-    "https://chococams.com/model/chaturbate/_stayhere", 
-    "https://chococams.com/model/stripchat/weiww1995",  # 修复了原代码这里的中文逗号
-    "https://chococams.com/model/stripchat/maneki-nekoo" 
+    "https://chococams.com", 
+    "https://chococams.com",  
+    "https://chococams.com" 
 ] 
 DATA_FILE = "live_links.txt" 
 
@@ -26,17 +27,27 @@ def save_links(links):
             f.write(f"{link}\n") 
 
 def fetch_m3u8_from_url(url, existing_links): 
-    """启动有头浏览器，捕获网络请求中的 m3u8 链接""" 
+    """动态选择有头/无头模式，捕获网络请求中的 m3u8 链接""" 
     new_links = set() 
     options = Options() 
-
-    # 保留关键的防爬虫伪装参数
+    
+    # 【核心修复】自动检测是否在 GitHub Actions 运行
+    # 如果在服务器运行，强制开启无头和沙盒，否则 Chrome 必然闪退
+    if os.environ.get('GITHUB_ACTIONS') == 'true' or sys.platform.startswith('linux'):
+        print("检测到当前在 Linux 服务器/GitHub 环境运行，自动启用 --headless 模式防止闪退。")
+        options.add_argument("--headless=new") 
+        options.add_argument("--no-sandbox") 
+        options.add_argument("--disable-dev-shm-usage") 
+    else:
+        print("检测到当前在本地电脑运行，自动弹出有头浏览器窗口。")
+    
+    # 保持防爬虫伪装参数
     options.add_argument("--disable-blink-features=AutomationControlled") 
     options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36") 
     options.add_experimental_option("excludeSwitches", ["enable-automation"]) 
     options.add_experimental_option('useAutomationExtension', False) 
     
-    # 开启性能日志（抓包核心）
+    # 开启性能日志
     options.set_capability('goog:loggingPrefs', {'performance': 'ALL'}) 
     
     driver = webdriver.Chrome(options=options) 
@@ -50,8 +61,7 @@ def fetch_m3u8_from_url(url, existing_links):
         print(f"正在访问: {url}") 
         driver.get(url) 
         
-        # 延长等待时间。如果是 Cloudflare 验证，你可以在弹出的浏览器中手动点击验证码
-        print("等待 15 秒供页面加载及通过验证...")
+        # 针对此类直播网站，适当延长等待时间（15秒）
         time.sleep(15) 
         
         # 解析浏览器网络日志 
@@ -66,6 +76,7 @@ def fetch_m3u8_from_url(url, existing_links):
                     
                     # 匹配 m3u8 链接 
                     if ".m3u8" in request_url: 
+                        # 【Bug 修复】确保 split 后拿到了字符串 [0]，避免集合对比出错
                         clean_url = request_url.split('?')[0] 
                         if clean_url not in existing_links and clean_url not in new_links: 
                             print(f"发现新链接: {clean_url}") 
