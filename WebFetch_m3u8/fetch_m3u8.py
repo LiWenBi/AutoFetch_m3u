@@ -31,15 +31,15 @@ def fetch_m3u8_from_url(url, existing_links):
     new_links = set() 
     options = Options() 
     
-    # 【核心修复】自动检测是否在 GitHub Actions 运行
-    # 如果在服务器运行，强制开启无头和沙盒，否则 Chrome 必然闪退
-    if os.environ.get('GITHUB_ACTIONS') == 'true' or sys.platform.startswith('linux'):
-        print("检测到当前在 Linux 服务器/GitHub 环境运行，自动启用 --headless 模式防止闪退。")
+    # 严格检查运行环境：如果检测到是 GitHub Actions，则强制启动无头模式防闪退
+    if os.environ.get('GITHUB_ACTIONS') == 'true':
+        print("[环境提示] 当前处于 GitHub Actions 云端环境，强制启用 --headless 无头模式。")
         options.add_argument("--headless=new") 
         options.add_argument("--no-sandbox") 
         options.add_argument("--disable-dev-shm-usage") 
+        options.add_argument("--disable-gpu")
     else:
-        print("检测到当前在本地电脑运行，自动弹出有头浏览器窗口。")
+        print("[环境提示] 当前处于本地电脑环境，正在为您启动【有头浏览器】窗口。")
     
     # 保持防爬虫伪装参数
     options.add_argument("--disable-blink-features=AutomationControlled") 
@@ -61,7 +61,8 @@ def fetch_m3u8_from_url(url, existing_links):
         print(f"正在访问: {url}") 
         driver.get(url) 
         
-        # 针对此类直播网站，适当延长等待时间（15秒）
+        # 延长等待时间供页面完整加载
+        print("等待 15 秒加载媒体流数据...")
         time.sleep(15) 
         
         # 解析浏览器网络日志 
@@ -76,7 +77,7 @@ def fetch_m3u8_from_url(url, existing_links):
                     
                     # 匹配 m3u8 链接 
                     if ".m3u8" in request_url: 
-                        # 【Bug 修复】确保 split 后拿到了字符串 [0]，避免集合对比出错
+                        # 【核心修复】取 split 后的第 0 个元素，确保 clean_url 是纯字符串而不是 List 列表
                         clean_url = request_url.split('?')[0] 
                         if clean_url not in existing_links and clean_url not in new_links: 
                             print(f"发现新链接: {clean_url}") 
