@@ -1,81 +1,97 @@
-import os
-import json
-import time
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
+import asyncio
+from playwright.async_api import async_playwright
 
-URL_FILE = 'url.txt'
-OUTPUT_FILE = 'live_links.txt'
+# 1. 改为列表（List），支持放多个需要检测的网页
+TARGET_URLS = [
+    "https://chococams.com/model/stripchat/jiajia_l",
+    "https://chococams.com/model/chaturbate/cute_fox_girl"
+]
 
-def init_driver():
-    """初始化配置坚固的 Chrome 浏览器实例"""
-    chrome_options = Options()
-    
-    # 彻底解决容器环境闪退的核心参数组
-    chrome_options.add_argument('--headless=new')          # 必须使用新版无头模式
-    chrome_options.add_argument('--no-sandbox')             # 禁用沙盒，Linux 容器必需
-    chrome_options.add_argument('--disable-dev-shm-usage')  # 禁用/dev/shm共享内存限制，防止崩溃
-    chrome_options.add_argument('--disable-gpu')            # 禁用GPU硬件加速
-    chrome_options.add_argument('--blink-settings=imagesEnabled=false') # 禁用图片加载提升速度
-    
-    # 开启网络包日志捕获
-    chrome_options.set_capability('goog:loggingPrefs', {'performance': 'ALL'})
-    
-    driver = webdriver.Chrome(options=chrome_options)
-    return driver
+async def handle_request(request):
+    """
+    拦截并检查每一个网络请求
+    """
+    url = request.url
+    # 检查请求链接中是否包含 .m3u8 关键字
+    if ".m3u8" in url.lower():
+        print(f"\n🎉 成功捕获到 m3u8 链接:")
+        print(f"URL: {url}")
+        print(f"请求方法: {request.method}")
+        print("-" * 50)
 
-def extract_m3u8_from_logs(driver):
-    """从浏览器性能日志过滤出合规的 m3u8 地址"""
-    m3u8_urls = set()
+async def check_url(context, url):
+    """
+    处理单个网址的抓取逻辑
+    """
+    page = await context.new_page()
+    
+    # 绑定网络监听事件
+    page.on("request", handle_request)
+    
+    print(f"\n[开始处理] 正在打开网页: {url} ...")
     try:
-        logs = driver.get_log('performance')
-        for entry in logs:
-            log_data = json.loads(entry['message'])['message']
-            if 'Network.requestWillBeSent' in log_data['method']:
-                url = log_data['params']['request']['url']
-                # 去除包含 'master' 的链接（不区分大小写）
-                if '.m3u8' in url.lower() and 'master' not in url.lower():
-                    m3u8_urls.add(url)
-    except Exception as e:
-        print(f"提取网络日志异常: {e}")
-    return m3u8_urls
-
-def main():
-    if not os.path.exists(URL_FILE):
-        print(f"错误：未找到 {URL_FILE} 文件。")
-        return
+        # 访问网页，等待网络相对空闲
+        await page.goto(url, wait_until="domcontentloaded", timeout=45000)
         
-    with open(URL_FILE, 'r', encoding='utf-8') as f:
-        urls = [line.strip() for line in f if line.strip()]
+        # 给网页 3 秒让其渲染 DOM 树
+        await asyncio.sleep(3)
         
-    if not urls:
-        print("没有可解析的网址。")
-        return
-
-    print(f"开始解析 {len(urls)} 个网址...")
-    driver = init_driver()
-    all_links = set()
-    
-    try:
-        for idx, url in enumerate(urls, 1):
-            print(f"[{idx}/{len(urls)}] 正在读取: {url}")
+        # 💡 针对流媒体网站的核心：尝试寻找播放按钮并点击
+        # 这里使用了多个常见的播放按钮选择器（文字包含、图标样式等）
+        play_selectors = [
+            "text=Play", "text=播放", 
+            ".play-button", "[aria-label='Play']", 
+            ".video-js .vjs-big-play-button", ".play-btn"
+        ]
+        
+        clicked = False
+        for selector in play_selectors:
             try:
-                driver.get(url)
-                time.sleep(10) # 适当延长等待时间，保证动态流加载完毕
-                found = extract_m3u8_from_logs(driver)
-                print(f"  -> 成功捕获 {len(found)} 个 m3u8 链接")
-                all_links.update(found)
-            except Exception as e:
-                print(f"  -> 访问网址失败: {e}")
-    finally:
-        driver.quit()
-
-    # 写入输出文件（去重并按字母排序）
-    with open(OUTPUT_FILE, 'w', encoding='utf-8') as f_out:
-        f_out.write('\n'.join(sorted(all_links)) + '\n')
+                # 检查选择器是否存在且可见
+                if await page.locator(selector).is_visible(timeout=2000):
+                    await page.click(selector)
+                    print(f"👉 成功点击了播放按钮: {selector}")
+                    clicked = True
+                    break
+            except Exception:
+                continue
         
-    print(f"所有任务执行完毕，结果已保存至 {OUTPUT_FILE}，共 {len(all_links)} 条。")
+        if not clicked:
+            # 如果没找到特定的按钮类名，直接模拟点击屏幕中心（通常是播放器中心位置）
+            print("⚠️ 未找到明确的播放按钮，尝试点击页面中心以触发播放...")
+            viewport = page.viewport_size
+            if viewport:
+                await page.mouse.click(viewport['width'] / 2, viewport['height'] / 2)
+            else:
+                await page.mouse.click(500, 400)
 
-if __name__ == '__main__':
-    main()
+        print("⌛ 正在等待视频加载/缓冲（持续 15 秒）...")
+        await asyncio.sleep(15)  # 留出足够时间让 m3u8 请求触发
+        
+    except Exception as e:
+        print(f"❌ 处理网址 {url} 时发生错误: {e}")
+    finally:
+        # 显式关闭当前页面，释放内存，防止影响下一个网址
+        await page.close()
+
+async def main():
+    async with async_playwright() as p:
+        # 在本地调试时建议将 headless 改为 False，能直观看到有没有点击成功
+        # 部署到 GitHub Actions 时请务必改回 True
+        browser = await p.chromium.launch(headless=True)
+        
+        # 创建上下文，加入更逼真的浏览器请求头
+        context = await browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            viewport={"width": 1280, "height": 720}
+        )
+        
+        # 循环遍历每个网址
+        for url in TARGET_URLS:
+            await check_url(context, url)
+            
+        # 最终关闭浏览器
+        await browser.close()
+
+if __name__ == "__main__":
+    asyncio.run(main())
