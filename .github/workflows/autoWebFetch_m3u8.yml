@@ -1,61 +1,38 @@
 name: Auto Fetch M3U8 Links
 
-# 触发条件
 on:
   push:
-    branches:
-      - main     # 当代码推送到 main 分支时触发
-  workflow_dispatch: # 允许在 GitHub 网页端手动点击按钮触发
+    branches: [main]
+  workflow_dispatch:
   schedule:
-    - cron: '0 0 * * *' # 每天国际标准时间 00:00 (北京时间 08:00) 自动运行一次
+    - cron: '0 0 * * *'
 
 jobs:
-  fetch:
-    runs-on: ubuntu-latest # 使用最新的 Ubuntu 环境
-
+  fetch_job:
+    runs-on: ubuntu-latest
     steps:
-    # Step 1: 拉取项目代码
-    - name: Checkout Repository
-      uses: actions/checkout@v4
-
-    # Step 2: 安装并配置最新稳定版 Chrome 浏览器
-    - name: Setup Chrome Browser
+    - uses: actions/checkout@v4
+    
+    # 自动配置匹配的 Chrome 和 ChromeDriver
+    - name: Setup Chrome and WebDriver
       uses: browser-actions/setup-chrome@v1
       with:
         chrome-version: stable
 
-    # Step 3: 设置 Python 环境
-    - name: Set up Python
-      uses: actions/setup-python@v5
+    - uses: actions/setup-python@v5
       with:
         python-version: '3.10'
 
-    # Step 4: 安装所需的 Python 依赖库
     - name: Install Dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install selenium
+      run: pip install selenium
 
-    # Step 5: 执行 Python 脚本抓取 m3u8
     - name: Run Fetch Script
-      run: |
-        python fetch_m3u8.py
+      run: python fetch_m3u8.py
 
-    # Step 6: 将生成的 live_links.txt 自动提交并推送到你的 GitHub 仓库
-    - name: Commit and Push Results
+    - name: Commit and Push Changes
       run: |
         git config --global user.name "github-actions[bot]"
         git config --global user.email "41898282+github-actions[bot]@://github.com"
-        
-        # 检查 live_links.txt 是否有变动，有变动则提交
-        if [ -f "live_links.txt" ]; then
-          git add live_links.txt
-          if git diff --staged --quiet; then
-            echo "链接无变化，无需更新。"
-          else
-            git commit -m "自动更新：已提取最新的 m3u8 直播链接"
-            git push
-          fi
-        else
-          echo "未生成 live_links.txt 文件，跳过提交。"
-        fi
+        git add live_links.txt
+        git diff --staged --quiet || git commit -m "update m3u8 links"
+        git push
