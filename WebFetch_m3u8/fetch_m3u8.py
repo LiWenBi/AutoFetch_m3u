@@ -6,8 +6,8 @@ from selenium.webdriver.chrome.options import Options
 
 # 1. 配置需要收集的直播网页列表
 TARGET_URLS = [
-    "https://zh-hans.chaturbate.com/ann__w/",
-    "https://zh.stripchat.com/weiww1995"
+    "https://chococams.com/model/chaturbate/_stayhere",
+    "https://chococams.com/model/stripchat/weiww1995"
 ]
 DATA_FILE = "live_links.txt"
 
