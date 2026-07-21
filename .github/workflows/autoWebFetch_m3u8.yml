@@ -1,9 +1,13 @@
 name: Auto Fetch M3U8 Live Streams
 
 on:
-  workflow_dispatch: # 允许你手动点击按钮触发
+  workflow_dispatch: # 允许你在 GitHub 网页端手动点击按钮触发运行
   schedule:
-    - cron: '0 * * * *' # 每小时自动运行一次
+    - cron: '0 * * * *' # 定时任务：每小时自动运行一次
+
+# 给 GitHub Actions 写入权限，允许它把 live_links.txt 的变动同步回你的仓库
+permissions:
+  contents: write
 
 jobs:
   run-spider:
@@ -14,7 +18,7 @@ jobs:
     - name: Checkout Repository Code
       uses: actions/checkout@v4
 
-    # 2. 设置 Python 环境（彻底移除了 cache 配置，绝不会再报 requirements.txt 错误）
+    # 2. 设置 Python 环境（不包含任何 cache 配置，彻底杜绝报错）
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
@@ -26,7 +30,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install playwright
 
-    # 4. 安装 Playwright 浏览器及系统依赖
+    # 4. 安装 Playwright 专属的 Chromium 浏览器内核及其系统依赖
     - name: Install Playwright Chromium Browser
       run: |
         playwright install chromium --with-deps
@@ -36,11 +40,11 @@ jobs:
       run: |
         python WebFetch_m3u8/fetch_m3u8.py
 
-    # 6. 【新增】自动将写入到 live_links.txt 的新链接提交并保存回 GitHub 仓库
+    # 6. 自动将新生成的 live_links.txt 提交并推送保存回你的 GitHub 仓库
     - name: Commit and Push live_links.txt
       run: |
         git config --global user.name "github-actions[bot]"
         git config --global user.email "github-actions[bot]@://github.com"
         git add live_links.txt
-        # 只有在文件有变动时才提交，防止没有新链接时报错中断
+        # 只有在文件有实际变动时才执行 commit & push，防止没有任何链接更新时报错中断
         git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update live_links.txt" && git push)
