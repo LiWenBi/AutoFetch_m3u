@@ -1,1 +1,2 @@
-当前无可用直播链接
+https://videos.strpst.com/197467228/f8c104e00295dbde636ae21003965221/hls/d042539bc5665486df8859e6760858d4-stream-0/stream.m3u8
+https://videos.strpst.com/197467228/f8c104e00295dbde636ae21003965221/hls/master.m3u8?md5=11_Yon09oAf6ekS6xK3Uig&expires=1785020671
