@@ -1,2 +1,2 @@
-https://videos.strpst.com/197467228/f8c104e00295dbde636ae21003965221/hls/master.m3u8?md5=SZ8jBmhBdXkmi1EAtu66dg&expires=1786372908
 https://videos.strpst.com/197467228/f8c104e00295dbde636ae21003965221/hls/d042539bc5665486df8859e6760858d4-stream-0/stream.m3u8
+https://videos.strpst.com/197467228/f8c104e00295dbde636ae21003965221/hls/master.m3u8?md5=jSr6Jxv3dubrm0obxnUDhQ&expires=1786376473
