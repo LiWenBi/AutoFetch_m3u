@@ -1,13 +1,1 @@
-https://media-hls.doppiocdn.net/b-hls-14/197467228/197467228_960p60.m3u8?playlistType=lowLatency&preferredVideoCodec=h264&psch=v2&pkey=NTK9aqcLmNFMWrpQ&_HLS_msn=1137&_HLS_part=0
-https://edge-hls.doppiocdn.net/hls/197467228/master/197467228_auto.m3u8?playlistType=lowLatency
-https://edge-hls.doppiocdn.media/ping.m3u8
-https://media-hls.doppiocdn.net/b-hls-14/197467228/197467228_960p60.m3u8?playlistType=lowLatency&preferredVideoCodec=h264&psch=v2&pkey=NTK9aqcLmNFMWrpQ
-https://media-hls.doppiocdn.net/b-hls-14/197467228/197467228_960p60.m3u8?playlistType=lowLatency&preferredVideoCodec=h264
-https://media-hls.doppiocdn.net/b-hls-14/197467228/197467228_960p60.m3u8?playlistType=lowLatency&preferredVideoCodec=h264&psch=v2&pkey=NTK9aqcLmNFMWrpQ&_HLS_msn=1136&_HLS_part=3
-https://edge-hls.doppiocdn.net/ping.m3u8
-https://media-hls.doppiocdn.net/b-hls-14/197467228/197467228_960p60.m3u8?playlistType=lowLatency&preferredVideoCodec=h264&psch=v2&pkey=NTK9aqcLmNFMWrpQ&_HLS_msn=1135&_HLS_part=3
-https://media-hls.doppiocdn.net/b-hls-14/197467228/197467228_960p60.m3u8?playlistType=lowLatency&preferredVideoCodec=h264&psch=v2&pkey=NTK9aqcLmNFMWrpQ&_HLS_msn=1136&_HLS_part=1
-https://media-hls.doppiocdn.net/b-hls-14/197467228/197467228_960p60.m3u8?playlistType=lowLatency&preferredVideoCodec=h264&psch=v2&pkey=NTK9aqcLmNFMWrpQ&_HLS_msn=1136&_HLS_part=2
-https://media-hls.doppiocdn.net/b-hls-14/197467228/197467228_960p60.m3u8?playlistType=lowLatency&preferredVideoCodec=h264&psch=v2&pkey=NTK9aqcLmNFMWrpQ&_HLS_msn=1137&_HLS_part=1
-https://media-hls.doppiocdn.net/b-hls-14/197467228/197467228_960p60.m3u8?playlistType=lowLatency&preferredVideoCodec=h264&psch=v2&pkey=NTK9aqcLmNFMWrpQ&_HLS_msn=1136&_HLS_part=0
-https://media-hls.doppiocdn.net/b-hls-14/cpa/v2/stream.m3u8
+当前无可用直播链接
